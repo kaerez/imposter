@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta name="description" content="Imposter - A social deduction game for friends">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Imposter">
+    
+    <title>IMPOSTER - המשחק</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Favicon (SVG) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕵️</text></svg>">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- 
+    ============================================
+    Author: Erez Kalman
+    Relative Directory: ./index.html
+    ============================================
+    -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700;900&display=swap');
+        
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: #1a1a1a;
+            color: #f3f4f6;
+            touch-action: manipulation; /* Improves touch response */
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none; /* Prevents pull-to-refresh on mobile */
+        }
+
+        .card-press-active {
+            transform: scale(0.98);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+            border-color: #ef4444;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #262626; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
+
+        .fade-enter { opacity: 0; transform: translateY(10px); }
+        .fade-enter-active { opacity: 1; transform: translateY(0); transition: opacity 300ms, transform 300ms; }
+        .fade-exit { opacity: 1; }
+        .fade-exit-active { opacity: 0; transition: opacity 200ms; }
+        
+        /* Toggles */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #ef4444;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- TRANSLATIONS ---
+        const TRANSLATIONS = {
+            he: {
+                title: "IMPOSTER",
+                subtitle: "מצא את המתחזה",
+                players_title: "כמות שחקנים",
+                imposters_title: "כמות מתחזים",
+                settings_title: "הגדרות מתחזה",
+                show_category: "הצג קטגוריה למתחזה",
+                show_clue: "הצג רמז למתחזה",
+                continue: "המשך",
+                names_title: "שמות השחקנים",
+                names_subtitle: "לחץ על שם כדי לערוך",
+                player_placeholder: "שחקנ/ית",
+                select_categories_btn: "בחר קטגוריות",
+                categories_title: "נושאים",
+                categories_subtitle: "בחר מאיזה נושאים יוגרלו המילים",
+                no_categories: "לא נמצאו קטגוריות לשפה זו",
+                start_game: "התחל משחק",
+                alert_select_category: "חובה לבחור לפחות קטגוריה אחת",
+                turn_success_title: "התור עבר בהצלחה",
+                start_discussion: "התחל דיון",
+                next_player_btn: "העבר לשחקן הבא",
+                turn_of: "תורו של",
+                press_hold: "לחץ והחזק",
+                to_see_card: "כדי לראות את הקלף",
+                ensure_privacy: "וודא שאף אחד אחר לא מסתכל על המסך",
+                imposter_label: "את/ה המתחזה!",
+                category_label: "קטגוריה:",
+                clue_prefix: "רמז:",
+                secret_word_label: "המילה הסודית:",
+                game_started: "המשחק התחיל!",
+                starter_text: "השחקן שמתחיל לשאול שאלות הוא:",
+                replay_same: "סיבוב נוסף (אותם שחקנים)",
+                change_settings: "שינוי הגדרות / שחקנים",
+                footer: "© 2025 KSEC | v2.5",
+                reveal_btn: "חשיפת סודות (3 שניות)",
+                imposter_reveal_title: "המתחזים:",
+                reveal_clue_title: "הרמז שהיה:",
+                reveal_word_title: "המילה:",
+                no_clue_for_imposter: "אין רמז"
+            },
+            en: {
+                title: "IMPOSTER",
+                subtitle: "Find the Imposter",
+                players_title: "Number of Players",
+                imposters_title: "Number of Imposters",
+                settings_title: "Imposter Settings",
+                show_category: "Show Category to Imposter",
+                show_clue: "Show Clue to Imposter",
+                continue: "Continue",
+                names_title: "Player Names",
+                names_subtitle: "Click name to edit",
+                player_placeholder: "Player",
+                select_categories_btn: "Select Categories",
+                categories_title: "Topics",
+                categories_subtitle: "Select topics for random words",
+                no_categories: "No categories found for this language",
+                start_game: "Start Game",
+                alert_select_category: "You must select at least one category",
+                turn_success_title: "Turn Completed",
+                start_discussion: "Start Discussion",
+                next_player_btn: "Pass to Next Player",
+                turn_of: "Turn of",
+                press_hold: "Press and Hold",
+                to_see_card: "to view your card",
+                ensure_privacy: "Ensure no one else is looking",
+                imposter_label: "You are the Imposter!",
+                category_label: "Category:",
+                clue_prefix: "Clue:",
+                secret_word_label: "Secret Word:",
+                game_started: "Game Started!",
+                starter_text: "The player starting the questioning is:",
+                replay_same: "Play Again (Same Players)",
+                change_settings: "Change Settings / Players",
+                footer: "© 2025 KSEC | v2.5",
+                reveal_btn: "Reveal Secrets (Hold 3s)",
+                imposter_reveal_title: "The Imposters:",
+                reveal_clue_title: "The Clue:",
+                reveal_word_title: "The Word:",
+                no_clue_for_imposter: "No Clue"
+            }
+        };
+
+        // --- ICONS ---
+        const Icons = {
+            User: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+            Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+            Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
+            EyeOff: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7c.88 0 1.77-.07 2.64-.2"/><line x1="2" x2="22" y1="2" y2="22"/></svg>,
+            Play: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>,
+            RotateCcw: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/></svg>,
+            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.35a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+            Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+            Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+            Minus: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/></svg>,
+            Help: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>,
+            Globe: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        };
+
+        // --- PARSER (Standard TOML Subset) ---
+
+        const parseTOML = (input) => {
+            const lines = input.split('\n');
+            const data = {};
+            let currentPath = []; 
+
+            lines.forEach(line => {
+                let trimmed = line.trim();
+                // Remove comments
+                if (trimmed.includes('#')) {
+                    trimmed = trimmed.split('#')[0].trim();
+                }
+                if (!trimmed) return;
+
+                // Table Header [A.B.C]
+                if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                    const pathStr = trimmed.slice(1, -1);
+                    currentPath = pathStr.split('.');
+                    
+                    // Initialize this path in data structure
+                    let current = data;
+                    currentPath.forEach(key => {
+                        if (!current[key]) current[key] = {};
+                        current = current[key];
+                    });
+                }
+                // Key = Value
+                else if (trimmed.includes('=')) {
+                    const splitIndex = trimmed.indexOf('=');
+                    const key = trimmed.slice(0, splitIndex).trim();
+                    let valStr = trimmed.slice(splitIndex + 1).trim();
+                    
+                    let parsedVal = null;
+
+                    // Parse Array ["a", "b"]
+                    if (valStr.startsWith('[') && valStr.endsWith(']')) {
+                        // Simple parser for standard string array
+                        try {
+                            // This regex matches "string" or 'string' inside brackets
+                            // It's a basic parser, assumes no nested arrays or complex escapes
+                            const inner = valStr.slice(1, -1);
+                            if (!inner) {
+                                parsedVal = [];
+                            } else {
+                                // Split by comma, ensuring we don't split inside quotes?
+                                // Simplified approach: Match quoted strings
+                                const matches = inner.match(/"([^"]*)"|'([^']*)'/g);
+                                if (matches) {
+                                    parsedVal = matches.map(s => s.slice(1, -1));
+                                } else {
+                                    parsedVal = [];
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Error parsing array:", valStr);
+                            parsedVal = [];
+                        }
+                    } 
+                    // Parse String "value"
+                    else if (valStr.startsWith('"') || valStr.startsWith("'")) {
+                        parsedVal = valStr.slice(1, -1);
+                    }
+                    else {
+                        // Fallback/Numbers/Booleans
+                        parsedVal = valStr;
+                    }
+
+                    // Assign to current path
+                    let current = data;
+                    if (currentPath.length > 0) {
+                        currentPath.forEach(p => {
+                            if (!current[p]) current[p] = {};
+                            current = current[p];
+                        });
+                        
+                        // Structure is usually [Language][Category] -> List of objects {word, clue}
+                        // But TOML is [Language.Category] key=value
+                        // So current is data[Language][Category]
+                        // We want to transform: { key: value } -> [ {word: key, clue: value} ]
+                        
+                        // We can't push to an array here directly because TOML defines keys one by one.
+                        // We will format it after parsing is done, OR store as object for now.
+                        current[key] = parsedVal;
+                    }
+                }
+            });
+
+            // Post-Processing: Convert Object-Map to Array format expected by App
+            // Expected: data[Lang][Category] = [ {word: '...', clue: '...'}, ... ]
+            const finalData = {};
+            Object.keys(data).forEach(lang => {
+                finalData[lang] = {};
+                Object.keys(data[lang]).forEach(cat => {
+                    finalData[lang][cat] = Object.entries(data[lang][cat]).map(([k, v]) => ({
+                        word: k,
+                        clue: v
+                    }));
+                });
+            });
+
+            return finalData;
+        };
+
+
+        // --- COMPONENTS ---
+
+        function App() {
+            // -- State --
+            const [step, setStep] = useState('setup_language');
+            const [numPlayers, setNumPlayers] = useState(3);
+            const [numImposters, setNumImposters] = useState(1);
+            // Settings
+            const [showCategoryToImposter, setShowCategoryToImposter] = useState(true);
+            const [showClueToImposter, setShowClueToImposter] = useState(false);
+            
+            const [players, setPlayers] = useState([]); 
+            const [parsedData, setParsedData] = useState({});
+            const [selectedPack, setSelectedPack] = useState(null);
+            const [selectedCategories, setSelectedCategories] = useState([]);
+            const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
+            const [secretWord, setSecretWord] = useState(null);
+            const [imposterClue, setImposterClue] = useState(null);
+            const [secretCategory, setSecretCategory] = useState(null);
+            const [starterPlayer, setStarterPlayer] = useState('');
+            const [uiLang, setUiLang] = useState('he');
+
+            // -- Load Data --
+            useEffect(() => {
+                fetch('./config.toml')
+                    .then(response => response.text())
+                    .then(text => {
+                        const data = parseTOML(text);
+                        setParsedData(data);
+                    })
+                    .catch(err => console.error("Failed to load config.toml", err));
+            }, []);
+
+            // -- UI Language Direction --
+            useEffect(() => {
+                document.documentElement.lang = uiLang;
+                document.documentElement.dir = uiLang === 'he' ? 'rtl' : 'ltr';
+            }, [uiLang]);
+
+            // -- Translation Helper --
+            const t = (key) => TRANSLATIONS[uiLang][key] || key;
+
+            // -- Handlers --
+
+            const handleLanguageSelect = (packName) => {
+                setSelectedPack(packName);
+                
+                if (packName.toLowerCase().includes('english')) {
+                    setUiLang('en');
+                } else {
+                    setUiLang('he');
+                }
+                
+                const storedCats = localStorage.getItem(`imposter_categories_${packName}`);
+                let finalCats = [];
+
+                if (storedCats) {
+                    finalCats = JSON.parse(storedCats);
+                } else {
+                    const packData = parsedData[packName] || {};
+                    finalCats = Object.keys(packData);
+                }
+                
+                setSelectedCategories(finalCats);
+                setStep('setup_players');
+            };
+
+            const handleStartSetupNames = () => {
+                // Initialize players with names
+                const savedNames = JSON.parse(localStorage.getItem(`imposter_names_${uiLang}`) || '[]');
+                const newPlayers = Array.from({ length: numPlayers }, (_, i) => ({
+                    id: i,
+                    name: savedNames[i] || `${t('player_placeholder')} ${i + 1}`,
+                    isDefaultName: !savedNames[i], // Flag to track if using default
+                    isImposter: false,
+                    seen: false
+                }));
+                setPlayers(newPlayers);
+                setStep('setup_names');
+            };
+
+            const handleNamesSubmit = (updatedPlayers) => {
+                // Save non-default names
+                const namesOnly = updatedPlayers.map(p => p.isDefaultName ? '' : p.name);
+                localStorage.setItem(`imposter_names_${uiLang}`, JSON.stringify(namesOnly));
+                setPlayers(updatedPlayers);
+                setStep('setup_categories');
+            };
+
+            const handleCategorySelection = (cats) => {
+                setSelectedCategories(cats);
+                localStorage.setItem(`imposter_categories_${selectedPack}`, JSON.stringify(cats));
+                startGame(players, cats);
+            };
+
+            const startGame = (currentPlayers, cats) => {
+                // 1. Pick Imposters (Multiple)
+                const indexes = Array.from({ length: currentPlayers.length }, (_, i) => i);
+                // Shuffle indexes
+                for (let i = indexes.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
+                }
+                const imposterIndexes = indexes.slice(0, numImposters);
+
+                const playersWithRoles = currentPlayers.map((p, i) => ({
+                    ...p,
+                    isImposter: imposterIndexes.includes(i),
+                    seen: false
+                }));
+
+                // 2. Pick Word
+                let pool = [];
+                const packData = parsedData[selectedPack];
+                
+                // Track source category for each word if possible
+                cats.forEach(catName => {
+                    if (packData && packData[catName]) {
+                        pool = [...pool, ...packData[catName].map(item => ({...item, category: catName}))];
+                    }
+                });
+
+                if (pool.length === 0) {
+                    alert(t('alert_select_category'));
+                    return;
+                }
+
+                const randomEntry = pool[Math.floor(Math.random() * pool.length)];
+                
+                // NEW: Handle Array Clues (Already arrays in parsedData)
+                let finalClue = randomEntry.clue;
+                if (Array.isArray(finalClue)) {
+                    finalClue = finalClue[Math.floor(Math.random() * finalClue.length)];
+                }
+
+                setSecretWord(randomEntry.word);
+                setImposterClue(finalClue);
+                setSecretCategory(randomEntry.category);
+                setPlayers(playersWithRoles);
+                setCurrentPlayerIndex(0);
+                setStep('game_reveal');
+            };
+
+            const handleNextPlayer = () => {
+                if (currentPlayerIndex < players.length - 1) {
+                    setCurrentPlayerIndex(prev => prev + 1);
+                } else {
+                    const randomStarter = players[Math.floor(Math.random() * players.length)];
+                    setStarterPlayer(randomStarter.name);
+                    setStep('game_result');
+                }
+            };
+
+            const handleReplay = (sameSettings) => {
+                if (sameSettings) {
+                    startGame(players, selectedCategories);
+                } else {
+                    setStep('setup_language'); 
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-4 max-w-md mx-auto relative">
+                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 opacity-80"></div>
+                    
+                    <header className="mb-6 text-center w-full">
+                         <h1 className="text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-400">
+                            {t('title')}
+                        </h1>
+                        <p className="text-gray-500 text-sm tracking-widest mt-1">{t('subtitle')}</p>
+                    </header>
+
+                    <main className="w-full bg-neutral-800 rounded-2xl shadow-2xl border border-neutral-700 p-6 relative">
+                        {step === 'setup_language' && (
+                            <StepLanguage 
+                                availablePacks={Object.keys(parsedData)}
+                                onSelect={handleLanguageSelect}
+                            />
+                        )}
+                        {step === 'setup_players' && (
+                            <StepPlayerCount 
+                                num={numPlayers} 
+                                setNum={setNumPlayers}
+                                imposters={numImposters}
+                                setImposters={setNumImposters}
+                                showCategory={showCategoryToImposter}
+                                setShowCategory={setShowCategoryToImposter}
+                                showClue={showClueToImposter}
+                                setShowClue={setShowClueToImposter}
+                                onNext={handleStartSetupNames}
+                                t={t} 
+                            />
+                        )}
+                        {step === 'setup_names' && (
+                            <StepNames 
+                                players={players} 
+                                onNext={handleNamesSubmit}
+                                t={t} 
+                            />
+                        )}
+                        {step === 'setup_categories' && (
+                            <StepCategories 
+                                packName={selectedPack}
+                                categories={parsedData[selectedPack] || {}} 
+                                selected={selectedCategories} 
+                                onStart={handleCategorySelection}
+                                t={t} 
+                            />
+                        )}
+                        {step === 'game_reveal' && (
+                            <StepReveal 
+                                player={players[currentPlayerIndex]} 
+                                word={secretWord} 
+                                clue={imposterClue}
+                                category={secretCategory}
+                                showCategory={showCategoryToImposter}
+                                showClue={showClueToImposter}
+                                onNext={handleNextPlayer}
+                                isLast={currentPlayerIndex === players.length - 1}
+                                t={t}
+                            />
+                        )}
+                        {step === 'game_result' && (
+                            <StepResult 
+                                starter={starterPlayer}
+                                players={players}
+                                word={secretWord}
+                                clue={imposterClue}
+                                onReplay={() => handleReplay(true)}
+                                onNewConfig={() => handleReplay(false)}
+                                t={t}
+                            />
+                        )}
+                    </main>
+
+                    <footer className="mt-8 text-gray-600 text-xs">
+                        {t('footer')}
+                    </footer>
+                </div>
+            );
+        }
+
+        // --- SUB COMPONENTS ---
+
+        function StepLanguage({ availablePacks, onSelect }) {
+            return (
+                <div className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500 text-center">
+                    <div className="mb-6 flex flex-col items-center justify-center">
+                        <Icons.Globe />
+                        <h2 className="text-xl font-bold mt-2">Select Language / בחר שפה</h2>
+                        <div className="mt-2 text-gray-500 text-xs flex flex-col gap-1 font-medium">
+                            <span dir="ltr">Which language for the words?</span>
+                            <span dir="rtl">באיזו שפה יהיו המילים?</span>
+                        </div>
+                    </div>
+
+                    <div className="w-full space-y-3">
+                        {availablePacks.map(pack => (
+                            <button 
+                                key={pack}
+                                onClick={() => onSelect(pack)}
+                                className="w-full bg-neutral-700 hover:bg-neutral-600 border border-neutral-600 text-white font-bold py-4 rounded-xl transition-all active:scale-95 flex items-center justify-center px-6"
+                            >
+                                <span className="text-lg">{pack}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function StepPlayerCount({ num, setNum, imposters, setImposters, showCategory, setShowCategory, showClue, setShowClue, onNext, t }) {
+            const maxImposters = Math.max(1, Math.floor(num / 2));
+            
+            // Adjust imposters if num players drops
+            useEffect(() => {
+                if (imposters > maxImposters) setImposters(maxImposters);
+            }, [num, maxImposters]);
+
+            return (
+                <div className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
+                    
+                    {/* Players Control */}
+                    <div className="mb-6 w-full bg-neutral-900/50 p-4 rounded-xl">
+                        <div className="flex items-center justify-center mb-4 text-gray-400 gap-2">
+                             <Icons.Users className="w-5 h-5"/>
+                             <span className="font-bold text-sm">{t('players_title')}</span>
+                        </div>
+                        <div className="flex items-center justify-center gap-6">
+                            <button 
+                                onClick={() => setNum(Math.max(3, num - 1))}
+                                className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center hover:bg-neutral-600 active:scale-95 transition-all text-red-400"
+                            >
+                                <Icons.Minus />
+                            </button>
+                            <span className="text-5xl font-black w-20 text-center text-white">{num}</span>
+                            <button 
+                                onClick={() => setNum(Math.min(20, num + 1))}
+                                className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center hover:bg-neutral-600 active:scale-95 transition-all text-green-400"
+                            >
+                                <Icons.Plus />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Imposters Control */}
+                    <div className="mb-6 w-full bg-neutral-900/50 p-4 rounded-xl">
+                        <div className="flex items-center justify-center mb-4 text-gray-400 gap-2">
+                             <Icons.EyeOff className="w-5 h-5"/>
+                             <span className="font-bold text-sm">{t('imposters_title')}</span>
+                        </div>
+                        <div className="flex items-center justify-center gap-6">
+                            <button 
+                                onClick={() => setImposters(Math.max(1, imposters - 1))}
+                                className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-95 transition-all ${imposters <= 1 ? 'bg-neutral-800 text-gray-600' : 'bg-neutral-700 hover:bg-neutral-600 text-red-400'}`}
+                                disabled={imposters <= 1}
+                            >
+                                <Icons.Minus />
+                            </button>
+                            <span className="text-5xl font-black w-20 text-center text-red-500">{imposters}</span>
+                            <button 
+                                onClick={() => setImposters(Math.min(maxImposters, imposters + 1))}
+                                className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-95 transition-all ${imposters >= maxImposters ? 'bg-neutral-800 text-gray-600' : 'bg-neutral-700 hover:bg-neutral-600 text-green-400'}`}
+                                disabled={imposters >= maxImposters}
+                            >
+                                <Icons.Plus />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Settings Toggles */}
+                    <div className="w-full mb-8 bg-neutral-900/50 p-4 rounded-xl space-y-4">
+                        <div className="flex items-center justify-center text-gray-400 gap-2 mb-2 border-b border-gray-700 pb-2">
+                             <Icons.Settings className="w-4 h-4"/>
+                             <span className="font-bold text-xs uppercase tracking-widest">{t('settings_title')}</span>
+                        </div>
+                        
+                        {/* Show Category Toggle */}
+                        <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-sm font-medium text-gray-300">{t('show_category')}</span>
+                            <div className="relative">
+                                <input type="checkbox" checked={showCategory} onChange={(e) => setShowCategory(e.target.checked)} className="sr-only toggle-checkbox" />
+                                <div className={`block w-10 h-6 rounded-full transition-colors ${showCategory ? 'bg-green-500' : 'bg-neutral-600'}`}></div>
+                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${showCategory ? 'transform translate-x-4 rtl:-translate-x-4' : ''}`}></div>
+                            </div>
+                        </label>
+
+                        {/* Show Clue Toggle */}
+                        <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-sm font-medium text-gray-300">{t('show_clue')}</span>
+                            <div className="relative">
+                                <input type="checkbox" checked={showClue} onChange={(e) => setShowClue(e.target.checked)} className="sr-only toggle-checkbox" />
+                                <div className={`block w-10 h-6 rounded-full transition-colors ${showClue ? 'bg-green-500' : 'bg-neutral-600'}`}></div>
+                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${showClue ? 'transform translate-x-4 rtl:-translate-x-4' : ''}`}></div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <button onClick={onNext} className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                        <span>{t('continue')}</span>
+                        <div className="rtl:rotate-180"><Icons.Play className="w-4 h-4" /></div>
+                    </button>
+                </div>
+            );
+        }
+
+        function StepNames({ players, onNext, t }) {
+            const [localPlayers, setLocalPlayers] = useState(players);
+
+            const handleFocus = (id) => {
+                const p = localPlayers.find(pl => pl.id === id);
+                // If it's a default name (matches format "Player X"), clear it
+                // We use the isDefaultName flag for robustness
+                if (p && p.isDefaultName) {
+                    const updated = localPlayers.map(pl => pl.id === id ? { ...pl, name: '', isDefaultName: false } : pl);
+                    setLocalPlayers(updated);
+                }
+            };
+
+            const handleChange = (id, val) => {
+                const updated = localPlayers.map(p => p.id === id ? { ...p, name: val, isDefaultName: false } : p);
+                setLocalPlayers(updated);
+            };
+
+            const handleBlur = (id) => {
+                // Optional: If left empty, restore default? 
+                // Requirement says "default text, cleared when typing". Usually better to fill it back if empty on submit.
+                // We will handle empty check on submit.
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                // Fill empty names with defaults if user cleared and left empty
+                const final = localPlayers.map((p, i) => ({
+                    ...p,
+                    name: p.name.trim() || `${t('player_placeholder')} ${i + 1}`,
+                    isDefaultName: !p.name.trim() // reset flag if empty
+                }));
+                onNext(final);
+            };
+
+            return (
+                <form onSubmit={handleSubmit} className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="mb-4 text-center">
+                        <h2 className="text-xl font-bold">{t('names_title')}</h2>
+                        <p className="text-gray-500 text-xs mt-1">{t('names_subtitle')}</p>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto max-h-[50vh] space-y-3 mb-6 pr-2">
+                        {localPlayers.map((p, i) => (
+                            <div key={p.id} className="relative">
+                                <span className="absolute right-4 rtl:right-auto rtl:left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">#{i + 1}</span>
+                                <input 
+                                    type="text" 
+                                    value={p.name}
+                                    onFocus={() => handleFocus(p.id)}
+                                    onChange={(e) => handleChange(p.id, e.target.value)}
+                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:border-red-500 transition-colors text-right rtl:text-right ltr:text-left"
+                                    style={{ textAlign: document.documentElement.dir === 'ltr' ? 'left' : 'right', paddingRight: document.documentElement.dir === 'rtl' ? '1rem' : '3rem', paddingLeft: document.documentElement.dir === 'rtl' ? '3rem' : '1rem' }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+
+                    <button type="submit" className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                         <span>{t('select_categories_btn')}</span>
+                         <div className="rtl:rotate-180"><Icons.Play className="w-4 h-4" /></div>
+                    </button>
+                </form>
+            );
+        }
+
+        function StepCategories({ packName, categories, selected, onStart, t }) {
+            const [localSelected, setLocalSelected] = useState(selected);
+
+            const toggleCat = (catName) => {
+                if (localSelected.includes(catName)) {
+                    setLocalSelected(localSelected.filter(k => k !== catName));
+                } else {
+                    setLocalSelected([...localSelected, catName]);
+                }
+            };
+
+            const handleStart = () => {
+                if (localSelected.length === 0) {
+                    alert(t('alert_select_category'));
+                    return;
+                }
+                onStart(localSelected);
+            };
+
+            return (
+                <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="mb-4 text-center">
+                         <h2 className="text-xl font-bold">{t('categories_title')}: {packName}</h2>
+                         <p className="text-gray-500 text-xs mt-1">{t('categories_subtitle')}</p>
+                    </div>
+
+                    <div className="space-y-3 mb-6">
+                        <div className="grid grid-cols-2 gap-2">
+                            {Object.keys(categories).map(cat => {
+                                const isSelected = localSelected.includes(cat);
+                                return (
+                                    <button 
+                                        key={cat}
+                                        onClick={() => toggleCat(cat)}
+                                        className={`relative py-4 px-2 rounded-xl text-sm font-bold transition-all ${isSelected ? 'bg-neutral-600 border-2 border-green-500 text-white shadow-lg' : 'bg-neutral-700 text-gray-300 hover:bg-neutral-600 border-2 border-transparent'}`}
+                                    >
+                                        {cat}
+                                        {isSelected && (
+                                            <div className="absolute top-1 right-1 rtl:right-auto rtl:left-1 text-green-400 bg-neutral-800 rounded-full p-0.5">
+                                                <Icons.Check size={12} strokeWidth={4} />
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {Object.keys(categories).length === 0 && (
+                            <div className="text-center text-gray-500 mt-10">
+                                {t('no_categories')}
+                            </div>
+                        )}
+                    </div>
+
+                    <button onClick={handleStart} className="w-full bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold py-4 rounded-xl shadow-lg hover:brightness-110 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <span>{t('start_game')}</span>
+                        <div className="rtl:rotate-180"><Icons.Play className="w-5 h-5 fill-current" /></div>
+                    </button>
+                </div>
+            );
+        }
+
+        function StepReveal({ player, word, clue, category, showCategory, showClue, onNext, isLast, t }) {
+            const [revealed, setRevealed] = useState(false);
+            const [seen, setSeen] = useState(false);
+            const timerRef = useRef(null);
+            
+            // Interaction Handlers
+            const startPress = () => {
+                if (seen) return;
+                // Visual feedback immediate, data reveal after minimal delay to prevent accidental flash
+                timerRef.current = setTimeout(() => {
+                    setRevealed(true);
+                }, 150); 
+            };
+
+            const endPress = () => {
+                if (timerRef.current) clearTimeout(timerRef.current);
+                if (revealed) {
+                    setRevealed(false);
+                    setSeen(true);
+                }
+            };
+
+            // Reset state when player changes
+            useEffect(() => {
+                setSeen(false);
+                setRevealed(false);
+            }, [player]);
+
+            // Prevent context menu on long press
+            const preventDefault = (e) => e.preventDefault();
+
+            if (seen) {
+                return (
+                    <div className="flex flex-col items-center justify-center h-64 animate-in fade-in zoom-in duration-300">
+                        <div className="text-green-500 mb-4">
+                            <Icons.Check className="w-16 h-16" />
+                        </div>
+                        <h3 className="text-xl font-bold mb-6">{t('turn_success_title')}</h3>
+                        <button 
+                            onClick={onNext}
+                            className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition-colors"
+                        >
+                            {isLast ? t('start_discussion') : t('next_player_btn')}
+                        </button>
+                    </div>
+                );
+            }
+
+            // Determine Label and Content based on role and settings
+            let label = t('secret_word_label');
+            let content = word;
+            let subContent = null;
+
+            if (player.isImposter) {
+                // Always show they are Imposter
+                label = t('imposter_label');
+                content = ""; // Main large text might differ
+
+                // Logic for what to show
+                if (showCategory && showClue) {
+                    label = `${t('imposter_label')}`;
+                    content = `${t('clue_prefix')} ${clue}`;
+                    subContent = `${t('category_label')} ${category}`;
+                } else if (showCategory && !showClue) {
+                    // Show only Category
+                    content = `${t('category_label')} ${category}`;
+                } else if (!showCategory && showClue) {
+                    // Show only Clue
+                    content = `${t('clue_prefix')} ${clue}`;
+                } else {
+                    // Show Nothing
+                    content = "🤫";
+                }
+            }
+
+            return (
+                <div className="flex flex-col items-center select-none">
+                    <div className="mb-2 text-center">
+                        <span className="text-gray-500 text-xs uppercase tracking-widest">{t('turn_of')}</span>
+                        <h2 className="text-3xl font-bold text-white mt-1">{player.name}</h2>
+                    </div>
+
+                    <div className="my-6 w-full relative h-48 perspective-1000">
+                        <button
+                            onMouseDown={startPress}
+                            onMouseUp={endPress}
+                            onMouseLeave={endPress}
+                            onTouchStart={startPress}
+                            onTouchEnd={endPress}
+                            onContextMenu={preventDefault}
+                            className={`w-full h-full rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-200 shadow-xl
+                                ${revealed 
+                                    ? 'bg-neutral-100 border-white scale-100' 
+                                    : 'bg-neutral-800 border-neutral-600 hover:border-neutral-500 active:scale-95 active:border-red-500 cursor-pointer'
+                                }
+                            `}
+                        >
+                            {revealed ? (
+                                <div className="text-center animate-in zoom-in duration-200 px-2">
+                                    <p className={`text-gray-500 text-xs font-bold mb-1 ${player.isImposter ? 'text-red-500 text-lg' : ''}`}>{label}</p>
+                                    <p className="text-black text-3xl font-black leading-tight">{content}</p>
+                                    {subContent && (
+                                        <p className="text-gray-600 text-sm font-bold mt-2 pt-2 border-t border-gray-300">{subContent}</p>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center text-gray-400">
+                                    <Icons.Eye className="w-10 h-10 mb-2 opacity-50" />
+                                    <p className="font-bold">{t('press_hold')}</p>
+                                    <p className="text-xs opacity-70 mt-1">{t('to_see_card')}</p>
+                                </div>
+                            )}
+                        </button>
+                    </div>
+
+                    <div className="text-center px-4">
+                        <p className="text-sm text-gray-500">
+                            {t('ensure_privacy')}
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
+        function StepResult({ starter, players, word, clue, onReplay, onNewConfig, t }) {
+            const [isRevealed, setIsRevealed] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const timerRef = useRef(null);
+            const startTimeRef = useRef(null);
+
+            const startPress = () => {
+                if (isRevealed) return;
+                startTimeRef.current = Date.now();
+                
+                timerRef.current = setInterval(() => {
+                    const elapsed = Date.now() - startTimeRef.current;
+                    const p = Math.min(100, (elapsed / 3000) * 100);
+                    setProgress(p);
+                    
+                    if (p >= 100) {
+                        clearInterval(timerRef.current);
+                        setIsRevealed(true);
+                    }
+                }, 20);
+            };
+
+            const endPress = () => {
+                if (isRevealed) return;
+                clearInterval(timerRef.current);
+                setProgress(0);
+            };
+
+            const imposters = players.filter(p => p.isImposter);
+
+            return (
+                <div className="flex flex-col items-center text-center animate-in fade-in slide-in-from-bottom-8 duration-700 w-full">
+                    {!isRevealed ? (
+                        <>
+                            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-purple-900/50">
+                                <span className="text-3xl">🎲</span>
+                            </div>
+
+                            <h2 className="text-2xl font-bold mb-2">{t('game_started')}</h2>
+                            <p className="text-gray-400 mb-8">
+                                {t('starter_text')}
+                                <br />
+                                <span className="text-3xl font-black text-white block mt-2">{starter}</span>
+                            </p>
+                        </>
+                    ) : (
+                        <div className="w-full mb-8 animate-in zoom-in duration-300">
+                            <div className="bg-red-500/20 border-2 border-red-500 rounded-2xl p-6 mb-4">
+                                <h3 className="text-red-400 text-sm font-bold uppercase tracking-widest mb-2">{t('imposter_reveal_title')}</h3>
+                                {imposters.map(imp => (
+                                    <p key={imp.id} className="text-3xl font-black text-white mb-1">{imp.name}</p>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-neutral-700/50 rounded-xl p-4">
+                                    <h4 className="text-gray-400 text-xs font-bold mb-1">{t('reveal_word_title')}</h4>
+                                    <p className="text-xl font-bold text-white">{word}</p>
+                                </div>
+                                <div className="bg-neutral-700/50 rounded-xl p-4">
+                                    <h4 className="text-gray-400 text-xs font-bold mb-1">{t('reveal_clue_title')}</h4>
+                                    <p className="text-xl font-bold text-white">{clue || t('no_clue_for_imposter')}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {!isRevealed && (
+                        <button
+                            onMouseDown={startPress}
+                            onMouseUp={endPress}
+                            onMouseLeave={endPress}
+                            onTouchStart={startPress}
+                            onTouchEnd={endPress}
+                            className="w-full mb-8 relative overflow-hidden bg-neutral-800 border-2 border-neutral-600 text-gray-300 font-bold py-4 rounded-xl hover:border-gray-400 transition-all select-none group"
+                        >
+                            <div 
+                                className="absolute top-0 left-0 h-full bg-red-900/50 transition-all duration-75 ease-linear"
+                                style={{ width: `${progress}%` }}
+                            />
+                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                <Icons.EyeOff className="w-5 h-5" />
+                                {t('reveal_btn')}
+                            </span>
+                        </button>
+                    )}
+
+                    <div className="w-full space-y-3">
+                        <button onClick={onReplay} className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                             <Icons.RotateCcw className="w-5 h-5" />
+                             <span>{t('replay_same')}</span>
+                        </button>
+                        <button onClick={onNewConfig} className="w-full bg-transparent border border-neutral-600 text-gray-300 font-bold py-4 rounded-xl hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2">
+                             <Icons.Settings className="w-5 h-5" />
+                             <span>{t('change_settings')}</span>
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+        
+        // PWA Registration Logic
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
