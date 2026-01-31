@@ -66,6 +66,15 @@
         .fade-enter-active { opacity: 1; transform: translateY(0); transition: opacity 300ms, transform 300ms; }
         .fade-exit { opacity: 1; }
         .fade-exit-active { opacity: 0; transition: opacity 200ms; }
+        
+        /* Toggles */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #ef4444;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #ef4444;
+        }
     </style>
 </head>
 <body>
@@ -109,7 +118,7 @@
                 starter_text: "השחקן שמתחיל לשאול שאלות הוא:",
                 replay_same: "סיבוב נוסף (אותם שחקנים)",
                 change_settings: "שינוי הגדרות / שחקנים",
-                footer: "© 2025 KSEC | v2.6",
+                footer: "© 2025 KSEC | v2.7",
                 reveal_btn: "חשיפת סודות (3 שניות)",
                 imposter_reveal_title: "המתחזים:",
                 reveal_clue_title: "הרמז שהיה:",
@@ -149,7 +158,7 @@
                 starter_text: "The player starting the questioning is:",
                 replay_same: "Play Again (Same Players)",
                 change_settings: "Change Settings / Players",
-                footer: "© 2025 KSEC | v2.6",
+                footer: "© 2025 KSEC | v2.7",
                 reveal_btn: "Reveal Secrets (Hold 3s)",
                 imposter_reveal_title: "The Imposters:",
                 reveal_clue_title: "The Clue:",
@@ -540,7 +549,8 @@
             return (
                 <label className="flex items-center justify-between cursor-pointer group">
                     <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">{label}</span>
-                    <div className="relative">
+                    {/* Force LTR for the toggle graphic to maintain Left=Off, Right=On mechanics consistently */}
+                    <div className="relative" dir="ltr">
                         <input 
                             type="checkbox" 
                             checked={checked} 
@@ -553,7 +563,6 @@
                         {/* Dot */}
                         <div className={`absolute top-[2px] left-[2px] bg-white border border-gray-100 w-6 h-6 rounded-full shadow-sm transition-transform duration-200 ease-in-out
                             ${checked ? 'translate-x-5' : 'translate-x-0'}
-                            rtl:peer-checked:-translate-x-5
                         `}></div>
                     </div>
                 </label>
