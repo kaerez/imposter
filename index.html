@@ -66,15 +66,6 @@
         .fade-enter-active { opacity: 1; transform: translateY(0); transition: opacity 300ms, transform 300ms; }
         .fade-exit { opacity: 1; }
         .fade-exit-active { opacity: 0; transition: opacity 200ms; }
-        
-        /* Toggles */
-        .toggle-checkbox:checked {
-            right: 0;
-            border-color: #ef4444;
-        }
-        .toggle-checkbox:checked + .toggle-label {
-            background-color: #ef4444;
-        }
     </style>
 </head>
 <body>
@@ -118,7 +109,7 @@
                 starter_text: "השחקן שמתחיל לשאול שאלות הוא:",
                 replay_same: "סיבוב נוסף (אותם שחקנים)",
                 change_settings: "שינוי הגדרות / שחקנים",
-                footer: "© 2025 KSEC | v2.5",
+                footer: "© 2025 KSEC | v2.6",
                 reveal_btn: "חשיפת סודות (3 שניות)",
                 imposter_reveal_title: "המתחזים:",
                 reveal_clue_title: "הרמז שהיה:",
@@ -158,7 +149,7 @@
                 starter_text: "The player starting the questioning is:",
                 replay_same: "Play Again (Same Players)",
                 change_settings: "Change Settings / Players",
-                footer: "© 2025 KSEC | v2.5",
+                footer: "© 2025 KSEC | v2.6",
                 reveal_btn: "Reveal Secrets (Hold 3s)",
                 imposter_reveal_title: "The Imposters:",
                 reveal_clue_title: "The Clue:",
@@ -220,16 +211,11 @@
 
                     // Parse Array ["a", "b"]
                     if (valStr.startsWith('[') && valStr.endsWith(']')) {
-                        // Simple parser for standard string array
                         try {
-                            // This regex matches "string" or 'string' inside brackets
-                            // It's a basic parser, assumes no nested arrays or complex escapes
                             const inner = valStr.slice(1, -1);
                             if (!inner) {
                                 parsedVal = [];
                             } else {
-                                // Split by comma, ensuring we don't split inside quotes?
-                                // Simplified approach: Match quoted strings
                                 const matches = inner.match(/"([^"]*)"|'([^']*)'/g);
                                 if (matches) {
                                     parsedVal = matches.map(s => s.slice(1, -1));
@@ -258,21 +244,12 @@
                             if (!current[p]) current[p] = {};
                             current = current[p];
                         });
-                        
-                        // Structure is usually [Language][Category] -> List of objects {word, clue}
-                        // But TOML is [Language.Category] key=value
-                        // So current is data[Language][Category]
-                        // We want to transform: { key: value } -> [ {word: key, clue: value} ]
-                        
-                        // We can't push to an array here directly because TOML defines keys one by one.
-                        // We will format it after parsing is done, OR store as object for now.
                         current[key] = parsedVal;
                     }
                 }
             });
 
             // Post-Processing: Convert Object-Map to Array format expected by App
-            // Expected: data[Lang][Category] = [ {word: '...', clue: '...'}, ... ]
             const finalData = {};
             Object.keys(data).forEach(lang => {
                 finalData[lang] = {};
@@ -559,6 +536,30 @@
             );
         }
 
+        function Toggle({ label, checked, onChange }) {
+            return (
+                <label className="flex items-center justify-between cursor-pointer group">
+                    <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">{label}</span>
+                    <div className="relative">
+                        <input 
+                            type="checkbox" 
+                            checked={checked} 
+                            onChange={onChange} 
+                            className="sr-only peer" 
+                        />
+                        {/* Track */}
+                        <div className={`w-12 h-7 rounded-full transition-colors duration-200 ease-in-out ${checked ? 'bg-green-500' : 'bg-neutral-600'}`}></div>
+                        
+                        {/* Dot */}
+                        <div className={`absolute top-[2px] left-[2px] bg-white border border-gray-100 w-6 h-6 rounded-full shadow-sm transition-transform duration-200 ease-in-out
+                            ${checked ? 'translate-x-5' : 'translate-x-0'}
+                            rtl:peer-checked:-translate-x-5
+                        `}></div>
+                    </div>
+                </label>
+            );
+        }
+
         function StepPlayerCount({ num, setNum, imposters, setImposters, showCategory, setShowCategory, showClue, setShowClue, onNext, t }) {
             const maxImposters = Math.max(1, Math.floor(num / 2));
             
@@ -625,25 +626,16 @@
                              <span className="font-bold text-xs uppercase tracking-widest">{t('settings_title')}</span>
                         </div>
                         
-                        {/* Show Category Toggle */}
-                        <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-sm font-medium text-gray-300">{t('show_category')}</span>
-                            <div className="relative">
-                                <input type="checkbox" checked={showCategory} onChange={(e) => setShowCategory(e.target.checked)} className="sr-only toggle-checkbox" />
-                                <div className={`block w-10 h-6 rounded-full transition-colors ${showCategory ? 'bg-green-500' : 'bg-neutral-600'}`}></div>
-                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${showCategory ? 'transform translate-x-4 rtl:-translate-x-4' : ''}`}></div>
-                            </div>
-                        </label>
-
-                        {/* Show Clue Toggle */}
-                        <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-sm font-medium text-gray-300">{t('show_clue')}</span>
-                            <div className="relative">
-                                <input type="checkbox" checked={showClue} onChange={(e) => setShowClue(e.target.checked)} className="sr-only toggle-checkbox" />
-                                <div className={`block w-10 h-6 rounded-full transition-colors ${showClue ? 'bg-green-500' : 'bg-neutral-600'}`}></div>
-                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${showClue ? 'transform translate-x-4 rtl:-translate-x-4' : ''}`}></div>
-                            </div>
-                        </label>
+                        <Toggle 
+                            label={t('show_category')} 
+                            checked={showCategory} 
+                            onChange={(e) => setShowCategory(e.target.checked)} 
+                        />
+                        <Toggle 
+                            label={t('show_clue')} 
+                            checked={showClue} 
+                            onChange={(e) => setShowClue(e.target.checked)} 
+                        />
                     </div>
 
                     <button onClick={onNext} className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
@@ -750,13 +742,14 @@
                         <div className="grid grid-cols-2 gap-2">
                             {Object.keys(categories).map(cat => {
                                 const isSelected = localSelected.includes(cat);
+                                const displayName = cat.replace(/_/g, ' '); // Replace underscores with spaces
                                 return (
                                     <button 
                                         key={cat}
                                         onClick={() => toggleCat(cat)}
                                         className={`relative py-4 px-2 rounded-xl text-sm font-bold transition-all ${isSelected ? 'bg-neutral-600 border-2 border-green-500 text-white shadow-lg' : 'bg-neutral-700 text-gray-300 hover:bg-neutral-600 border-2 border-transparent'}`}
                                     >
-                                        {cat}
+                                        {displayName}
                                         {isSelected && (
                                             <div className="absolute top-1 right-1 rtl:right-auto rtl:left-1 text-green-400 bg-neutral-800 rounded-full p-0.5">
                                                 <Icons.Check size={12} strokeWidth={4} />
@@ -838,15 +831,17 @@
                 // Always show they are Imposter
                 label = t('imposter_label');
                 content = ""; // Main large text might differ
+                
+                const displayCategory = category ? category.replace(/_/g, ' ') : '';
 
                 // Logic for what to show
                 if (showCategory && showClue) {
                     label = `${t('imposter_label')}`;
                     content = `${t('clue_prefix')} ${clue}`;
-                    subContent = `${t('category_label')} ${category}`;
+                    subContent = `${t('category_label')} ${displayCategory}`;
                 } else if (showCategory && !showClue) {
                     // Show only Category
-                    content = `${t('category_label')} ${category}`;
+                    content = `${t('category_label')} ${displayCategory}`;
                 } else if (!showCategory && showClue) {
                     // Show only Clue
                     content = `${t('clue_prefix')} ${clue}`;
